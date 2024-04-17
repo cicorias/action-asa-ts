@@ -16,6 +16,14 @@ type ErrorResponse = {
 // Union type for the function return value
 type Response = SuccessResponse | ErrorResponse
 
+// "provisioningState": "Succeeded",
+// "jobState": "Created",
+
+// Created, Stopped, Failed'
+// (Conflict) The Stream Analytics job is in a 'Idle' state. In order to perform a 
+// 'Write' operation on the Stream Analytics Job Transformation, 
+// the streaming job must be in any of these valid states: 'Created, Stopped, Failed'.
+
 // NOTE: from doc: Running, Stopped, Degraded, Failed
 // NOTE: from err message: valid to stop states:'Idle, Processing, Degraded, Starting, Restarting, Scaling'
 const StopStates: Set<string> = new Set([
