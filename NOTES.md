@@ -1,4 +1,17 @@
+## Local Developer Configuration
+
+### Requirements
+- nodejs v20.x
+- local-action - `npm i -g @github/local-action`
+
+
+### Actions Workflow
+
+This action relies on the published action: [Azure Login](https://github.com/marketplace/actions/azure-login)
+
 # References
+
+
 
 - source repo
   [https://github.com/github/local-action](https://github.com/github/local-action)
@@ -74,3 +87,13 @@ export AZURE_CONFIG_DIR=$(PWD)/.config/azure
 
 eslint on tests
 eslint to use ym file
+
+
+## cleaning up old action runs
+
+```sh
+# Replace `workflow.yml` with your actual workflow file name
+for run_id in $(gh run list --workflow=check-dist.yml --json databaseId | jq '.[].databaseId'); do
+    gh run delete $run_id --repo cicorias/action-asa-ts
+done
+```
