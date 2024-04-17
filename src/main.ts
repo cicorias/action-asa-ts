@@ -1,5 +1,23 @@
 import * as core from '@actions/core'
-import { wait } from './wait'
+import { getLogLevel, setLogLevel, AzureLogLevel } from '@azure/logger'
+import { StreamingJobManager } from './modules/asa'
+
+// type Command = 'start' | 'stop' | 'update' | 'status'
+enum Command {
+  Start = 'start',
+  Stop = 'stop',
+  Update = 'update',
+  Status = 'status'
+}
+
+type Settings = {
+  command: Command
+  jobName: string
+  resourceGroup: string
+  subscriptionId: string
+  jobQuery?: string
+  logLevel?: string
+}
 
 /**
  * The main function for the action.
@@ -7,20 +25,77 @@ import { wait } from './wait'
  */
 export async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
-
     // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    const settings = getSettings();
+
+    if (!settings) {
+      throw new Error('Invalid settings provided...')
+    }
+
+    // TODO: validate the logLevel input is one of these
+    // verbose, info, warning, error
+
+    setLogLevel(settings.logLevel as AzureLogLevel || 'warning')
+    core.info(`Log level set to: ${getLogLevel()}`)
+
+    const asaManager = new StreamingJobManager(
+      settings.jobName,
+      settings.resourceGroup,
+      settings.subscriptionId
+    )
+
+    let status = await asaManager.getStatus()
+    core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
+
+    switch (settings.command) {
+      case 'stop':
+        await asaManager.stop()
+        break
+      case 'start':
+        await asaManager.start()
+        break
+      case 'update':
+        // TODO: implement
+        await asaManager.update()
+        break
+      case 'status':
+        // already have status
+        break
+      default:
+        throw new Error(`Unknown command: ${settings.command}`)
+    }
+
+    status = await asaManager.getStatus()
+    core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
     // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    core.setOutput('job-start-status', status)
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
   }
+}
+
+
+function validateCommand(commandInput: string): commandInput is Command {
+  return Object.values(Command).includes(commandInput as Command);
+}
+
+function getSettings(): Settings | undefined {
+  const commandInput = core.getInput('command', { required: true })
+  if (!validateCommand(commandInput)) {
+    const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`
+    core.setFailed(msg)
+    throw new Error(msg)
+  }
+
+  return {
+    command: commandInput as Command,  // Type assertion here for enum usage
+    jobName: core.getInput('job-name', { required: true }),
+    resourceGroup: core.getInput('resource-group', { required: true }),
+    subscriptionId: core.getInput('subscription', { required: true }),
+    jobQuery: core.getInput('job-query', { required: false }),
+    logLevel: core.getInput('log-level', { required: false })
+  };
 }

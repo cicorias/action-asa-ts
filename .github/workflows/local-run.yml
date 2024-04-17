@@ -1,0 +1,49 @@
+name: local runnning only
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - addingpackages
+
+env:
+  ACTIONS_RUNNER_DEBUG: true
+  ACTIONS_STEP_DEBUG: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS_JSON }}
+
+      # - name: Azure CLI script
+      #   uses: azure/CLI@v1
+      #   with:
+      #     azcliversion: latest
+      #     inlineScript: |
+      #       az account show
+
+      - name: Test Local Action
+        id: test-action
+        uses: ./
+        with:
+          job-name: foobar
+          resource-group: fizbuzz
+          subscription: ab9999
+          job-query: |
+            select * from foobar
+          start-time: now
+
+      - name: Print Output
+        id: output
+        run: echo "${{ steps.test-action.outputs.job-start-status }}"

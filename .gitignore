@@ -101,3 +101,12 @@ __tests__/runner/*
 .idea
 .vscode
 *.code-workspace
+
+
+## act
+.secrets
+
+## local config
+.config/
+dist/xdg-open
+.envrc

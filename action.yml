@@ -1,23 +1,39 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: azure-streamanalytics-helper-action
+description:
+  updates azure streaming analytics job wrapping with a stop and start
+author: Shawn Cicoria
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
-  icon: 'heart'
-  color: 'red'
+  icon: 'activity'
+  color: 'green'
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: 'Your input description here'
+  command:
+    description: The command to run
     required: true
-    default: '1000'
+  job-name:
+    description: The name of the job to update
+    required: true
+  resource-group:
+    description: The resource group of the job
+    required: true
+  subscription:
+    description: The subscription of the job
+    required: true
+  job-query:
+    description: The query to update the job with
+    required: false
+  start-time:
+    description: instead of last update time
+    required: false
+  log-level:
+    description: The log level
+    required: false
+    default: warning
 
-# Define your outputs here.
 outputs:
-  time:
-    description: 'Your output description here'
+  job-start-status:
+    description: The time we greeted you
 
 runs:
   using: node20
