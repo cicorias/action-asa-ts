@@ -59,11 +59,15 @@ describe('StreamingJobManager', () => {
       }
     })
     // Mock the getStatus method to return a stoppable state
-    manager.getStatus = jest.fn().mockResolvedValueOnce('running').mockResolvedValueOnce('stopped')
+    manager.getStatus = jest
+      .fn()
+      .mockResolvedValueOnce('running')
+      .mockResolvedValueOnce('stopped')
 
     // Setup the beginStopAndWait to resolve when called
-    const mockBeginStopAndWait = ((manager as any).client as StreamAnalyticsManagementClient).streamingJobs
-      .beginStopAndWait as jest.Mock
+    const mockBeginStopAndWait = (
+      (manager as any).client as StreamAnalyticsManagementClient
+    ).streamingJobs.beginStopAndWait as jest.Mock
     mockBeginStopAndWait.mockResolvedValue('stopped')
 
     await manager.stop()
@@ -86,18 +90,21 @@ describe('StreamingJobManager', () => {
   })
 
   it('getStatus throws an exception', async () => {
-    manager.getStatus = jest.fn().mockRejectedValue(new Error("failed to get status"))
+    manager.getStatus = jest
+      .fn()
+      .mockRejectedValue(new Error('failed to get status'))
     const mockBeginStopAndWait = (manager as any).client.streamingJobs
       .beginStopAndWait as jest.Mock
-    await expect(manager.getStatus()).rejects.toThrow("failed to get status");
+    await expect(manager.getStatus()).rejects.toThrow('failed to get status')
   })
 
   it('stop throws an exception', async () => {
-    manager.getStatus = jest.fn().mockRejectedValue(new Error("failed to get status"))
+    manager.getStatus = jest
+      .fn()
+      .mockRejectedValue(new Error('failed to get status'))
     const mockBeginStopAndWait = (manager as any).client.streamingJobs
       .beginStopAndWait as jest.Mock
 
-    await expect(manager.stop()).rejects.toThrow("failed to get status");
-
+    await expect(manager.stop()).rejects.toThrow('failed to get status')
   })
 })

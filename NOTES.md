@@ -1,17 +1,16 @@
 ## Local Developer Configuration
 
 ### Requirements
+
 - nodejs v20.x
 - local-action - `npm i -g @github/local-action`
 
-
 ### Actions Workflow
 
-This action relies on the published action: [Azure Login](https://github.com/marketplace/actions/azure-login)
+This action relies on the published action:
+[Azure Login](https://github.com/marketplace/actions/azure-login)
 
 # References
-
-
 
 - source repo
   [https://github.com/github/local-action](https://github.com/github/local-action)
@@ -81,13 +80,9 @@ az ad sp create-for-rbac --name myServicePrincipalName --role reader --scopes /s
 export AZURE_CONFIG_DIR=$(PWD)/.config/azure
 ```
 
-
-
 ## TODO:
 
-eslint on tests
-eslint to use ym file
-
+eslint on tests eslint to use ym file
 
 ## cleaning up old action runs
 

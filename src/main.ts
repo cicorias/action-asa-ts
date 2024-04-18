@@ -2,7 +2,6 @@ import * as core from '@actions/core'
 import { getLogLevel, setLogLevel, AzureLogLevel } from '@azure/logger'
 import { StreamingJobManager } from './modules/asa'
 
-// type Command = 'start' | 'stop' | 'update' | 'status'
 enum Command {
   Start = 'start',
   Stop = 'stop',
@@ -11,7 +10,7 @@ enum Command {
 }
 
 type Settings = {
-  command: Command
+  cmd: Command
   jobName: string
   resourceGroup: string
   subscriptionId: string
@@ -27,7 +26,7 @@ export async function run(): Promise<void> {
   try {
     // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
 
-    const settings = getSettings();
+    const settings = getSettings()
 
     if (!settings) {
       throw new Error('Invalid settings provided...')
@@ -36,7 +35,7 @@ export async function run(): Promise<void> {
     // TODO: validate the logLevel input is one of these
     // verbose, info, warning, error
 
-    setLogLevel(settings.logLevel as AzureLogLevel || 'warning')
+    setLogLevel((settings.logLevel as AzureLogLevel) || 'warning')
     core.info(`Log level set to: ${getLogLevel()}`)
 
     const asaManager = new StreamingJobManager(
@@ -48,7 +47,7 @@ export async function run(): Promise<void> {
     let status = await asaManager.getStatus()
     core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
-    switch (settings.command) {
+    switch (settings.cmd) {
       case 'stop':
         await asaManager.stop()
         break
@@ -63,7 +62,7 @@ export async function run(): Promise<void> {
         // already have status
         break
       default:
-        throw new Error(`Unknown command: ${settings.command}`)
+        throw new Error(`Unknown command: ${settings.cmd}`)
     }
 
     status = await asaManager.getStatus()
@@ -77,9 +76,8 @@ export async function run(): Promise<void> {
   }
 }
 
-
 function validateCommand(commandInput: string): commandInput is Command {
-  return Object.values(Command).includes(commandInput as Command);
+  return Object.values(Command).includes(commandInput as Command)
 }
 
 function getSettings(): Settings | undefined {
@@ -91,11 +89,11 @@ function getSettings(): Settings | undefined {
   }
 
   return {
-    command: commandInput as Command,  // Type assertion here for enum usage
+    cmd: commandInput, // as Command, // Type assertion here for enum usage
     jobName: core.getInput('job-name', { required: true }),
     resourceGroup: core.getInput('resource-group', { required: true }),
     subscriptionId: core.getInput('subscription', { required: true }),
     jobQuery: core.getInput('job-query', { required: false }),
     logLevel: core.getInput('log-level', { required: false })
-  };
+  }
 }

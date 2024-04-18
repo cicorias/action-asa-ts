@@ -20,8 +20,8 @@ type Response = SuccessResponse | ErrorResponse
 // "jobState": "Created",
 
 // Created, Stopped, Failed'
-// (Conflict) The Stream Analytics job is in a 'Idle' state. In order to perform a 
-// 'Write' operation on the Stream Analytics Job Transformation, 
+// (Conflict) The Stream Analytics job is in a 'Idle' state. In order to perform a
+// 'Write' operation on the Stream Analytics Job Transformation,
 // the streaming job must be in any of these valid states: 'Created, Stopped, Failed'.
 
 // NOTE: from doc: Running, Stopped, Degraded, Failed
