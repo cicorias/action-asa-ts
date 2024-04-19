@@ -28,7 +28,6 @@ describe('StreamingJobManager', () => {
   const subscriptionId = '99999999-9999-9999-9999-999999999999'
 
   beforeEach(() => {
-    jest.clearAllMocks()
     setupCoreMocks()
     manager = new StreamingJobManager(jobName, resourceGroup, subscriptionId)
   })

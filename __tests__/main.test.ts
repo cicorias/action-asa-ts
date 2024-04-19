@@ -8,19 +8,14 @@
 
 // import { getInputMock, debugMock, errorMock, setFailedMock, setOutputMock } from './utils'
 import * as main from '../src/main'
+import { setupCoreMocks } from './utils'
 
 // Mock the action's main function
 const runMock = jest.spyOn(main, 'run')
 
 describe('action', () => {
   beforeEach(() => {
-    jest.clearAllMocks()
-
-    // debugMock = jest.spyOn(core, 'debug').mockImplementation()
-    // errorMock = jest.spyOn(core, 'error').mockImplementation()
-    // getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
-    // setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
-    // setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
+    setupCoreMocks()
   })
 
   it('sets the time output', async () => {
