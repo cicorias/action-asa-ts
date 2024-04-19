@@ -1,3 +1,17 @@
+## Local Developer Configuration
+
+### Requirements
+
+- nodejs v20.x
+- local-action - `npm i -g @github/local-action` -- see
+  [installation](https://github.com/github/local-action?tab=readme-ov-file#installation)
+  for more information
+
+### Actions Workflow
+
+This action relies on the published action:
+[Azure Login](https://github.com/marketplace/actions/azure-login)
+
 # References
 
 - source repo
@@ -68,9 +82,15 @@ az ad sp create-for-rbac --name myServicePrincipalName --role reader --scopes /s
 export AZURE_CONFIG_DIR=$(PWD)/.config/azure
 ```
 
-
-
 ## TODO:
 
-eslint on tests
-eslint to use ym file
+eslint on tests eslint to use ym file
+
+## cleaning up old action runs
+
+```sh
+# Replace `workflow.yml` with your actual workflow file name
+for run_id in $(gh run list --workflow=check-dist.yml --json databaseId | jq '.[].databaseId'); do
+    gh run delete $run_id --repo cicorias/action-asa-ts
+done
+```

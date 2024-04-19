@@ -2,19 +2,27 @@ import * as core from '@actions/core'
 import { StreamAnalyticsManagementClient } from '@azure/arm-streamanalytics'
 import { DefaultAzureCredential } from '@azure/identity'
 
-type SuccessResponse = {
-  status: 'success'
+export type Response = {
+  ok: true
   data: string
 }
 
-type ErrorResponse = {
-  status: 'error'
-  errorMessage: string
-  data: string
+type JobTransformation = {
+  query: string
+  etag?: string
 }
 
-// Union type for the function return value
-type Response = SuccessResponse | ErrorResponse
+type JobInformation = {
+  jobState: string
+  provisioningState: string
+  transformation?: JobTransformation
+  etag?: string
+}
+
+// Created, Stopped, Failed'
+// (Conflict) The Stream Analytics job is in a 'Idle' state. In order to perform a
+// 'Write' operation on the Stream Analytics Job Transformation,
+// the streaming job must be in any of these valid states: 'Created, Stopped, Failed'.
 
 // NOTE: from doc: Running, Stopped, Degraded, Failed
 // NOTE: from err message: valid to stop states:'Idle, Processing, Degraded, Starting, Restarting, Scaling'
@@ -28,7 +36,7 @@ const StopStates: Set<string> = new Set([
   'scaling'
 ])
 
-const StartStates: Set<string> = new Set(['stopped'])
+const StartStates: Set<string> = new Set(['stopped', 'failed'])
 
 /** a class that wraps StreamingAnalyticsManagement client in order to
  * accept request to Stop, Start, or update a Streaming Job
@@ -61,29 +69,30 @@ export class StreamingJobManager {
         )
         const currentStatus = await this.getStatus()
         if (!StartStates.has(currentStatus.toLocaleLowerCase())) {
-          throw this.packError('Failed to stop the job', currentStatus)
+          throw this.packError(
+            `Failed to stop the job. Current status: ${currentStatus}`
+          )
         }
 
         core.info(`Streaming job '${this.jobName}' has been stopped.`)
 
         return {
-          data: `Streaming job '${this.jobName}' has been successfully stopped.`,
-          status: 'success'
+          ok: true,
+          data: `Streaming job '${this.jobName}' has been successfully stopped.`
         }
       } catch (error) {
-        throw this.packError('Error stopping the jobs', error)
+        throw this.packError('Error stopping the jobs', error as Error)
       }
     }
     if (StartStates.has(status.toLocaleLowerCase())) {
       core.info(`Streaming job already in ${status} state -- no need to stop`)
       return {
-        data: `Streaming job '${this.jobName}' is already ${status}.`,
-        status: 'success'
+        ok: true,
+        data: `Streaming job '${this.jobName}' is already ${status}.`
       }
     } else {
       throw this.packError(
-        `Streaming job '${this.jobName}' is not in a stoppable state.`,
-        null
+        `Streaming job '${this.jobName}' is not in a stoppable state.`
       )
     }
   }
@@ -99,77 +108,125 @@ export class StreamingJobManager {
         )
         const currentStatus = await this.getStatus()
         if (!StopStates.has(currentStatus.toLocaleLowerCase())) {
-          throw this.packError('Failed to start the job', currentStatus)
+          throw this.packError(`Failed to start the job ${currentStatus}`)
         }
 
         core.info(`Streaming job '${this.jobName}' has been started.`)
 
         return {
-          data: `Streaming job '${this.jobName}' has been successfully started.`,
-          status: 'success'
+          ok: true,
+          data: `Streaming job '${this.jobName}' has been successfully started.`
         }
       } catch (error) {
-        throw this.packError('Error starting the jobs', error)
+        throw this.packError('Error starting the jobs', error as Error)
       }
     }
     // TODO: probably just running state.
+    // we are here AFTER a potential update that prior may have put the job in a 'failed' state
     if (StopStates.has(status.toLocaleLowerCase())) {
       core.info(`Streaming job already in ${status} state -- no need to start`)
       return {
-        data: `Streaming job '${this.jobName}' is already ${status}.`,
-        status: 'success'
+        ok: true,
+        data: `Streaming job '${this.jobName}' is already ${status}.`
       }
     } else {
       throw this.packError(
-        `Streaming job '${this.jobName}' is not in a startable state.`,
-        null
+        `Streaming job '${this.jobName}' is not in a startable state.`
       )
     }
   }
 
-  // TODO: fix the message parm
-  private packError(msg: string, error: unknown): unknown {
-    core.error(`${msg} '${this.jobName}': ${error}`)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const e: any = new Error(`${msg} '${this.jobName}': ${error}`)
-    return (e.data = error)
+  async update(restart = false, jobQuery: string): Promise<Response> {
+    if (!jobQuery || jobQuery.length === 0) {
+      throw new Error('jobQuery is required when updating the job.')
+    }
+
+    const currentJob = await this.client.streamingJobs.get(
+      this.resourceGroup,
+      this.jobName,
+      { expand: 'transformation' }
+    )
+
+    const oldQuery = currentJob.transformation?.query ?? ''
+    const transformationName = currentJob.transformation?.name ?? ''
+    let isSameQuery = false
+    let finalMessage = `Streaming job '${this.jobName}' with transformation '${transformationName}'`
+
+    if (oldQuery === jobQuery && !restart) {
+      isSameQuery = true
+      core.info('No change in query, skipping update')
+      finalMessage += ' has no changes to apply.'
+    }
+
+    // NOTE: terraform provider hard codes the "transformation name" to "main"
+    // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
+    if (!transformationName || transformationName.length === 0) {
+      throw new Error('Transformation name not found in the job.')
+    }
+
+    await this.stop()
+
+    const newTransformation: JobTransformation = {
+      query: jobQuery,
+      etag: currentJob.transformation?.etag
+    }
+
+    if (!isSameQuery) {
+      core.info('Change in query, applying update')
+      finalMessage += ' has been updated.'
+      await this.client.transformations.update(
+        this.resourceGroup,
+        this.jobName,
+        transformationName,
+        newTransformation
+      )
+    }
+    // go conservative here....
+    if (restart) {
+      await this.start()
+    }
+
+    return {
+      ok: true,
+      data: finalMessage
+    }
+  }
+
+  private packError(msg: string, error?: string | Error): Error {
+    let e: Error
+    if (error instanceof Error) {
+      e = new Error(`${msg} '${this.jobName}': ${error.message}`)
+    } else {
+      e = new Error(`${msg} '${this.jobName}': ${error}`)
+    }
+    core.error(e)
+    return e
   }
 
   private async checkStatus(): Promise<string> {
     try {
-      return await this.getStatus()
+      return this.getStatus()
     } catch (error) {
-      throw this.packError('Failed to retrieve the status of the job.', error)
+      throw this.packError(
+        'Failed to retrieve the status of the job.',
+        error as Error
+      )
     }
   }
 
-  async update(): Promise<void> {
-    // Implement update logic here
-    await this.stop()
-    // update the asa sql
-    // await this.client.streamingJobs.update(this.resourceGroup, this.jobName, {)
-    const currentTransformation = await this.client.transformations.get(
+  async getJobInfo(): Promise<JobInformation> {
+    const rv = await this.client.streamingJobs.get(
       this.resourceGroup,
-      this.jobName,
-      'transformationName'
+      this.jobName
     )
-    currentTransformation.query = 'SELECT * FROM input'
-
-    await this.client.transformations.update(
-      this.resourceGroup,
-      this.jobName,
-      'transformationName',
-      currentTransformation
-    )
-    await this.start()
+    return {
+      jobState: rv.jobState?.toLocaleLowerCase() ?? '',
+      provisioningState: rv.provisioningState ?? '',
+      etag: rv.etag ?? ''
+    }
   }
-
   async getStatus(): Promise<string> {
-    return (
-      (
-        await this.client.streamingJobs.get(this.resourceGroup, this.jobName)
-      ).jobState?.toLocaleLowerCase() ?? ''
-    )
+    return (await this.getJobInfo()).jobState
   }
 
   async canStop(): Promise<boolean> {

@@ -8,7 +8,7 @@ branding:
   color: 'green'
 
 inputs:
-  command:
+  cmd:
     description: The command to run
     required: true
   job-name:
@@ -23,17 +23,20 @@ inputs:
   job-query:
     description: The query to update the job with
     required: false
+  restart:
+    description: restart the job
+    required: false
   start-time:
     description: instead of last update time
     required: false
   log-level:
-    description: The log level
+    description: The log level - verbose, info, warning, error
     required: false
     default: warning
 
 outputs:
   job-start-status:
-    description: The time we greeted you
+    description: streaming job information
 
 runs:
   using: node20

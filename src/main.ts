@@ -1,8 +1,7 @@
 import * as core from '@actions/core'
 import { getLogLevel, setLogLevel, AzureLogLevel } from '@azure/logger'
-import { StreamingJobManager } from './modules/asa'
+import { Response, StreamingJobManager } from './modules/asa'
 
-// type Command = 'start' | 'stop' | 'update' | 'status'
 enum Command {
   Start = 'start',
   Stop = 'stop',
@@ -11,11 +10,12 @@ enum Command {
 }
 
 type Settings = {
-  command: Command
+  cmd: Command
   jobName: string
   resourceGroup: string
   subscriptionId: string
   jobQuery?: string
+  restart: boolean
   logLevel?: string
 }
 
@@ -27,7 +27,7 @@ export async function run(): Promise<void> {
   try {
     // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
 
-    const settings = getSettings();
+    const settings = getSettings()
 
     if (!settings) {
       throw new Error('Invalid settings provided...')
@@ -36,7 +36,7 @@ export async function run(): Promise<void> {
     // TODO: validate the logLevel input is one of these
     // verbose, info, warning, error
 
-    setLogLevel(settings.logLevel as AzureLogLevel || 'warning')
+    setLogLevel((settings.logLevel as AzureLogLevel) || 'warning')
     core.info(`Log level set to: ${getLogLevel()}`)
 
     const asaManager = new StreamingJobManager(
@@ -48,42 +48,46 @@ export async function run(): Promise<void> {
     let status = await asaManager.getStatus()
     core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
-    switch (settings.command) {
+    let rv: Response
+    switch (settings.cmd) {
       case 'stop':
-        await asaManager.stop()
+        rv = await asaManager.stop()
         break
       case 'start':
-        await asaManager.start()
+        rv = await asaManager.start()
         break
       case 'update':
         // TODO: implement
-        await asaManager.update()
+        rv = await asaManager.update(settings.restart, settings.jobQuery || '')
         break
       case 'status':
         // already have status
+        rv = {
+          ok: true,
+          data: `Streaming job '${settings.jobName}' is in state: ${status}`
+        }
         break
       default:
-        throw new Error(`Unknown command: ${settings.command}`)
+        throw new Error(`Unknown command: ${settings.cmd}`)
     }
 
     status = await asaManager.getStatus()
     core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
     // Set outputs for other workflow steps to use
-    core.setOutput('job-start-status', status)
+    core.setOutput('job-start-status', prettyResponse(rv))
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
   }
 }
 
-
 function validateCommand(commandInput: string): commandInput is Command {
-  return Object.values(Command).includes(commandInput as Command);
+  return Object.values(Command).includes(commandInput as Command)
 }
 
 function getSettings(): Settings | undefined {
-  const commandInput = core.getInput('command', { required: true })
+  const commandInput = core.getInput('cmd', { required: true })
   if (!validateCommand(commandInput)) {
     const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`
     core.setFailed(msg)
@@ -91,11 +95,20 @@ function getSettings(): Settings | undefined {
   }
 
   return {
-    command: commandInput as Command,  // Type assertion here for enum usage
+    cmd: commandInput, // as Command, // Type assertion here for enum usage
     jobName: core.getInput('job-name', { required: true }),
     resourceGroup: core.getInput('resource-group', { required: true }),
     subscriptionId: core.getInput('subscription', { required: true }),
     jobQuery: core.getInput('job-query', { required: false }),
+    restart: core.getInput('restart', { required: false }) === 'true',
     logLevel: core.getInput('log-level', { required: false })
-  };
+  }
+}
+
+// convert Response type instance to a pretty JSON string
+function prettyResponse(response: Response): string {
+  if (typeof response === 'object') {
+    return JSON.stringify(response, null, 2)
+  }
+  return response as string
 }

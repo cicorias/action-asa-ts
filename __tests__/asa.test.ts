@@ -1,14 +1,6 @@
-import * as core from '@actions/core'
-import { StreamingJobManager } from '../src/modules/asa'
 import { StreamAnalyticsManagementClient } from '@azure/arm-streamanalytics'
-import { DefaultAzureCredential } from '@azure/identity'
-
-// Mock the GitHub Actions core library
-let debugMock: jest.SpiedFunction<typeof core.debug>
-let errorMock: jest.SpiedFunction<typeof core.error>
-let getInputMock: jest.SpiedFunction<typeof core.getInput>
-let setFailedMock: jest.SpiedFunction<typeof core.setFailed>
-let setOutputMock: jest.SpiedFunction<typeof core.setOutput>
+import { StreamingJobManager } from '../src/modules/asa'
+import { getInputMock, setupCoreMocks } from './utils'
 
 jest.mock('@azure/arm-streamanalytics', () => {
   return {
@@ -36,12 +28,7 @@ describe('StreamingJobManager', () => {
   const subscriptionId = '99999999-9999-9999-9999-999999999999'
 
   beforeEach(() => {
-    jest.clearAllMocks()
-    debugMock = jest.spyOn(core, 'debug').mockImplementation()
-    errorMock = jest.spyOn(core, 'error').mockImplementation()
-    getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
-    setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
-    setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
+    setupCoreMocks()
     manager = new StreamingJobManager(jobName, resourceGroup, subscriptionId)
   })
 
@@ -59,11 +46,18 @@ describe('StreamingJobManager', () => {
       }
     })
     // Mock the getStatus method to return a stoppable state
-    manager.getStatus = jest.fn().mockResolvedValueOnce('running').mockResolvedValueOnce('stopped')
+    manager.getStatus = jest
+      .fn()
+      .mockResolvedValueOnce('running')
+      .mockResolvedValueOnce('stopped')
 
     // Setup the beginStopAndWait to resolve when called
-    const mockBeginStopAndWait = ((manager as any).client as StreamAnalyticsManagementClient).streamingJobs
-      .beginStopAndWait as jest.Mock
+    /* eslint-disable @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any */
+    const mockBeginStopAndWait = (
+      (manager as any).client as StreamAnalyticsManagementClient
+    ).streamingJobs.beginStopAndWait as jest.Mock
+    /* eslint-enable */
+
     mockBeginStopAndWait.mockResolvedValue('stopped')
 
     await manager.stop()
@@ -77,6 +71,7 @@ describe('StreamingJobManager', () => {
     manager.getStatus = jest.fn().mockResolvedValue('Stopped')
 
     // Setup the beginStopAndWait to resolve when called
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockBeginStopAndWait = (manager as any).client.streamingJobs
       .beginStopAndWait as jest.Mock
 
@@ -86,18 +81,17 @@ describe('StreamingJobManager', () => {
   })
 
   it('getStatus throws an exception', async () => {
-    manager.getStatus = jest.fn().mockRejectedValue(new Error("failed to get status"))
-    const mockBeginStopAndWait = (manager as any).client.streamingJobs
-      .beginStopAndWait as jest.Mock
-    await expect(manager.getStatus()).rejects.toThrow("failed to get status");
+    manager.getStatus = jest
+      .fn()
+      .mockRejectedValue(new Error('failed to get status'))
+    await expect(manager.getStatus()).rejects.toThrow('failed to get status')
   })
 
   it('stop throws an exception', async () => {
-    manager.getStatus = jest.fn().mockRejectedValue(new Error("failed to get status"))
-    const mockBeginStopAndWait = (manager as any).client.streamingJobs
-      .beginStopAndWait as jest.Mock
+    manager.getStatus = jest
+      .fn()
+      .mockRejectedValue(new Error('failed to get status'))
 
-    await expect(manager.stop()).rejects.toThrow("failed to get status");
-
+    await expect(manager.stop()).rejects.toThrow('failed to get status')
   })
 })

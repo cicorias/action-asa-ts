@@ -13,7 +13,7 @@ ignorePatterns:
   - '**/dist/.*'
   - '**/coverage/.*'
   - '*.json'
-  - '__tests__/**' # TODO: fix tests
+  # - '__tests__/**' # TODO: fix tests
 
 parser: '@typescript-eslint/parser'
 
@@ -35,8 +35,7 @@ extends:
   - plugin:github/recommended
   - plugin:jest/recommended
 
-rules:
-  {
+rules: {
     'camelcase': 'off',
     'eslint-comments/no-use': 'off',
     'eslint-comments/no-unused-disable': 'off',
@@ -65,6 +64,10 @@ rules:
     '@typescript-eslint/no-namespace': 'error',
     '@typescript-eslint/no-non-null-assertion': 'warn',
     '@typescript-eslint/no-require-imports': 'error',
+    # see gh issue https://github.com/github/eslint-plugin-github/issues/126
+    'no-shadow': 'off',
+    '@typescript-eslint/no-shadow':
+      ['error', { 'ignoreTypeValueShadow': true }],
     '@typescript-eslint/no-unnecessary-qualifier': 'error',
     '@typescript-eslint/no-unnecessary-type-assertion': 'error',
     '@typescript-eslint/no-unused-vars': 'error',
