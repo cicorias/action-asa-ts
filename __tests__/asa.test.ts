@@ -1,14 +1,6 @@
-import * as core from '@actions/core'
-import { StreamingJobManager } from '../src/modules/asa'
 import { StreamAnalyticsManagementClient } from '@azure/arm-streamanalytics'
-import { DefaultAzureCredential } from '@azure/identity'
-
-// Mock the GitHub Actions core library
-let debugMock: jest.SpiedFunction<typeof core.debug>
-let errorMock: jest.SpiedFunction<typeof core.error>
-let getInputMock: jest.SpiedFunction<typeof core.getInput>
-let setFailedMock: jest.SpiedFunction<typeof core.setFailed>
-let setOutputMock: jest.SpiedFunction<typeof core.setOutput>
+import { StreamingJobManager } from '../src/modules/asa'
+import { getInputMock, setupCoreMocks } from './utils'
 
 jest.mock('@azure/arm-streamanalytics', () => {
   return {
@@ -37,11 +29,7 @@ describe('StreamingJobManager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-    debugMock = jest.spyOn(core, 'debug').mockImplementation()
-    errorMock = jest.spyOn(core, 'error').mockImplementation()
-    getInputMock = jest.spyOn(core, 'getInput').mockImplementation()
-    setFailedMock = jest.spyOn(core, 'setFailed').mockImplementation()
-    setOutputMock = jest.spyOn(core, 'setOutput').mockImplementation()
+    setupCoreMocks()
     manager = new StreamingJobManager(jobName, resourceGroup, subscriptionId)
   })
 
@@ -68,6 +56,7 @@ describe('StreamingJobManager', () => {
     const mockBeginStopAndWait = (
       (manager as any).client as StreamAnalyticsManagementClient
     ).streamingJobs.beginStopAndWait as jest.Mock
+
     mockBeginStopAndWait.mockResolvedValue('stopped')
 
     await manager.stop()

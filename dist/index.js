@@ -48716,7 +48716,6 @@ class StreamingJobManager {
             throw this.packError(`Streaming job '${this.jobName}' is not in a startable state.`);
         }
     }
-    // TODO: fix the message parm
     packError(msg, error) {
         let e;
         if (error instanceof Error) {
