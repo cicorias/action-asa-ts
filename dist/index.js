@@ -48537,7 +48537,7 @@ async function run() {
                 break;
             case 'update':
                 // TODO: implement
-                rv = await asaManager.update(settings.restart, settings.jobQuery || '');
+                rv = await asaManager.update(settings.restart, settings.jobQuery ?? '');
                 break;
             case 'status':
                 // already have status
