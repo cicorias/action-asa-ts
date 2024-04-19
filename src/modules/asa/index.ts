@@ -3,7 +3,7 @@ import { StreamAnalyticsManagementClient } from '@azure/arm-streamanalytics'
 import { DefaultAzureCredential } from '@azure/identity'
 
 export type Response = {
-  ok: true
+  ok: boolean
   data: string
 }
 
@@ -59,7 +59,7 @@ export class StreamingJobManager {
   }
 
   async stop(): Promise<Response> {
-    const status: string = await this.checkStatus()
+    const status: string = await this.getStatus()
 
     if (StopStates.has(status.toLocaleLowerCase())) {
       try {
@@ -98,7 +98,7 @@ export class StreamingJobManager {
   }
 
   async start(): Promise<Response> {
-    const status: string = await this.checkStatus()
+    const status: string = await this.getStatus()
 
     if (StartStates.has(status.toLocaleLowerCase())) {
       try {
@@ -152,7 +152,8 @@ export class StreamingJobManager {
     let isSameQuery = false
     let finalMessage = `Streaming job '${this.jobName}' with transformation '${transformationName}'`
 
-    if (oldQuery === jobQuery && !restart) {
+    if (oldQuery === jobQuery) {
+      //  && !restart) {
       isSameQuery = true
       core.info('No change in query, skipping update')
       finalMessage += ' has no changes to apply.'
@@ -203,17 +204,6 @@ export class StreamingJobManager {
     return e
   }
 
-  private async checkStatus(): Promise<string> {
-    try {
-      return this.getStatus()
-    } catch (error) {
-      throw this.packError(
-        'Failed to retrieve the status of the job.',
-        error as Error
-      )
-    }
-  }
-
   async getJobInfo(): Promise<JobInformation> {
     const rv = await this.client.streamingJobs.get(
       this.resourceGroup,
@@ -225,11 +215,8 @@ export class StreamingJobManager {
       etag: rv.etag ?? ''
     }
   }
+
   async getStatus(): Promise<string> {
     return (await this.getJobInfo()).jobState
-  }
-
-  async canStop(): Promise<boolean> {
-    return StopStates.has(await this.getStatus())
   }
 }

@@ -48504,7 +48504,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.run = void 0;
+exports.run = exports.Command = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const logger_1 = __nccwpck_require__(9497);
 const asa_1 = __nccwpck_require__(443);
@@ -48514,26 +48514,20 @@ var Command;
     Command["Stop"] = "stop";
     Command["Update"] = "update";
     Command["Status"] = "status";
-})(Command || (Command = {}));
+})(Command || (exports.Command = Command = {}));
 /**
  * The main function for the action.
  * @returns {Promise<void>} Resolves when the action is complete.
  */
 async function run() {
     try {
-        // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
         const settings = getSettings();
-        if (!settings) {
-            throw new Error('Invalid settings provided...');
-        }
-        // TODO: validate the logLevel input is one of these
         // verbose, info, warning, error
         (0, logger_1.setLogLevel)(settings.logLevel || 'warning');
         core.info(`Log level set to: ${(0, logger_1.getLogLevel)()}`);
         const asaManager = new asa_1.StreamingJobManager(settings.jobName, settings.resourceGroup, settings.subscriptionId);
-        let status = await asaManager.getStatus();
-        core.info(`Streaming job '${settings.jobName}' is in state: ${status}`);
-        let rv;
+        let rv = { ok: false, data: 'No response' };
+        let status;
         switch (settings.cmd) {
             case 'stop':
                 rv = await asaManager.stop();
@@ -48547,23 +48541,21 @@ async function run() {
                 break;
             case 'status':
                 // already have status
+                status = await asaManager.getStatus();
+                core.info(`Streaming job '${settings.jobName}' is in state: ${status}`);
                 rv = {
                     ok: true,
                     data: `Streaming job '${settings.jobName}' is in state: ${status}`
                 };
                 break;
-            default:
-                throw new Error(`Unknown command: ${settings.cmd}`);
         }
-        status = await asaManager.getStatus();
-        core.info(`Streaming job '${settings.jobName}' is in state: ${status}`);
         // Set outputs for other workflow steps to use
         core.setOutput('job-start-status', prettyResponse(rv));
     }
     catch (error) {
         // Fail the workflow run if an error occurs
         if (error instanceof Error)
-            core.setFailed(error.message);
+            core.setFailed(error);
     }
 }
 exports.run = run;
@@ -48574,7 +48566,6 @@ function getSettings() {
     const commandInput = core.getInput('cmd', { required: true });
     if (!validateCommand(commandInput)) {
         const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`;
-        core.setFailed(msg);
         throw new Error(msg);
     }
     return {
@@ -48592,6 +48583,7 @@ function prettyResponse(response) {
     if (typeof response === 'object') {
         return JSON.stringify(response, null, 2);
     }
+    /* istanbul ignore next */
     return response;
 }
 
@@ -48663,7 +48655,7 @@ class StreamingJobManager {
         this.subscriptionId = subscriptionId;
     }
     async stop() {
-        const status = await this.checkStatus();
+        const status = await this.getStatus();
         if (StopStates.has(status.toLocaleLowerCase())) {
             try {
                 await this.client.streamingJobs.beginStopAndWait(this.resourceGroup, this.jobName);
@@ -48693,7 +48685,7 @@ class StreamingJobManager {
         }
     }
     async start() {
-        const status = await this.checkStatus();
+        const status = await this.getStatus();
         if (StartStates.has(status.toLocaleLowerCase())) {
             try {
                 await this.client.streamingJobs.beginStartAndWait(this.resourceGroup, this.jobName);
@@ -48733,7 +48725,8 @@ class StreamingJobManager {
         const transformationName = currentJob.transformation?.name ?? '';
         let isSameQuery = false;
         let finalMessage = `Streaming job '${this.jobName}' with transformation '${transformationName}'`;
-        if (oldQuery === jobQuery && !restart) {
+        if (oldQuery === jobQuery) {
+            //  && !restart) {
             isSameQuery = true;
             core.info('No change in query, skipping update');
             finalMessage += ' has no changes to apply.';
@@ -48773,14 +48766,6 @@ class StreamingJobManager {
         core.error(e);
         return e;
     }
-    async checkStatus() {
-        try {
-            return this.getStatus();
-        }
-        catch (error) {
-            throw this.packError('Failed to retrieve the status of the job.', error);
-        }
-    }
     async getJobInfo() {
         const rv = await this.client.streamingJobs.get(this.resourceGroup, this.jobName);
         return {
@@ -48791,9 +48776,6 @@ class StreamingJobManager {
     }
     async getStatus() {
         return (await this.getJobInfo()).jobState;
-    }
-    async canStop() {
-        return StopStates.has(await this.getStatus());
     }
 }
 exports.StreamingJobManager = StreamingJobManager;
