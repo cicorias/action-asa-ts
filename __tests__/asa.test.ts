@@ -53,9 +53,11 @@ describe('StreamingJobManager', () => {
       .mockResolvedValueOnce('stopped')
 
     // Setup the beginStopAndWait to resolve when called
-    const mockBeginStopAndWait = (
-      (manager as any).client as StreamAnalyticsManagementClient
-    ).streamingJobs.beginStopAndWait as jest.Mock
+    // eslint-disable-next-line @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any
+    const mockBeginStopAndWait =
+      // eslint-disable-next-line @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any
+      ((manager as any).client as StreamAnalyticsManagementClient).streamingJobs
+        .beginStopAndWait as jest.Mock
 
     mockBeginStopAndWait.mockResolvedValue('stopped')
 
@@ -70,6 +72,7 @@ describe('StreamingJobManager', () => {
     manager.getStatus = jest.fn().mockResolvedValue('Stopped')
 
     // Setup the beginStopAndWait to resolve when called
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockBeginStopAndWait = (manager as any).client.streamingJobs
       .beginStopAndWait as jest.Mock
 
@@ -82,8 +85,6 @@ describe('StreamingJobManager', () => {
     manager.getStatus = jest
       .fn()
       .mockRejectedValue(new Error('failed to get status'))
-    const mockBeginStopAndWait = (manager as any).client.streamingJobs
-      .beginStopAndWait as jest.Mock
     await expect(manager.getStatus()).rejects.toThrow('failed to get status')
   })
 
@@ -91,8 +92,6 @@ describe('StreamingJobManager', () => {
     manager.getStatus = jest
       .fn()
       .mockRejectedValue(new Error('failed to get status'))
-    const mockBeginStopAndWait = (manager as any).client.streamingJobs
-      .beginStopAndWait as jest.Mock
 
     await expect(manager.stop()).rejects.toThrow('failed to get status')
   })
