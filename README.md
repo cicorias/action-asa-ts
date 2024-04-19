@@ -9,10 +9,10 @@ There is a known blocker with ASA that Terraform, ARM Templates, that you must f
 ## Usage
 
 In your GitHub workflow, you can ideally use the action `azure/login@v2` to establish an Azure Login for this action. 
->NOTE: this action makes use of `DefaultAzureCredentials` to automatically use an available crdential based upon the fallback rules. see [defaultazurecredential](https://learn.microsoft.com/en-us/azure/developer/javascript/sdk/authentication/overview#sequence-of-selecting-authentication-methods-when-using-defaultazurecredential)
+>NOTE: this action makes use of `DefaultAzureCredentials` to automatically use an available credential based upon the fallback rules. see [defaultazurecredential](https://learn.microsoft.com/en-us/azure/developer/javascript/sdk/authentication/overview#sequence-of-selecting-authentication-methods-when-using-defaultazurecredential)
 
 
-In thee following, the Azure Login step is used, then a bash command to read in the ASA SQL to an environment variable, which is then passed to the settings on this actionfor the `job-query`.
+In the following, the Azure Login step is used, then a bash command to read in the ASA SQL to an environment variable, which is then passed to the settings on this action for the `job-query`.
 
 ```yaml
   asa-deployment:
