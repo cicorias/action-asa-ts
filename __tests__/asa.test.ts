@@ -53,11 +53,11 @@ describe('StreamingJobManager', () => {
       .mockResolvedValueOnce('stopped')
 
     // Setup the beginStopAndWait to resolve when called
-    // eslint-disable-next-line @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any
-    const mockBeginStopAndWait =
-      // eslint-disable-next-line @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any
-      ((manager as any).client as StreamAnalyticsManagementClient).streamingJobs
-        .beginStopAndWait as jest.Mock
+    /* eslint-disable @typescript-eslint/unbound-method,@typescript-eslint/no-explicit-any */
+    const mockBeginStopAndWait = (
+      (manager as any).client as StreamAnalyticsManagementClient
+    ).streamingJobs.beginStopAndWait as jest.Mock
+    /* eslint-enable */
 
     mockBeginStopAndWait.mockResolvedValue('stopped')
 
