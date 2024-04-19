@@ -48542,7 +48542,7 @@ async function run() {
                 break;
             case 'update':
                 // TODO: implement
-                await asaManager.update();
+                await asaManager.update(settings.restart, settings.jobQuery || '');
                 break;
             case 'status':
                 // already have status
@@ -48566,7 +48566,7 @@ function validateCommand(commandInput) {
     return Object.values(Command).includes(commandInput);
 }
 function getSettings() {
-    const commandInput = core.getInput('command', { required: true });
+    const commandInput = core.getInput('cmd', { required: true });
     if (!validateCommand(commandInput)) {
         const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`;
         core.setFailed(msg);
@@ -48578,6 +48578,7 @@ function getSettings() {
         resourceGroup: core.getInput('resource-group', { required: true }),
         subscriptionId: core.getInput('subscription', { required: true }),
         jobQuery: core.getInput('job-query', { required: false }),
+        restart: core.getInput('restart', { required: false }) === 'true',
         logLevel: core.getInput('log-level', { required: false })
     };
 }
@@ -48618,8 +48619,6 @@ exports.StreamingJobManager = void 0;
 const core = __importStar(__nccwpck_require__(2186));
 const arm_streamanalytics_1 = __nccwpck_require__(5885);
 const identity_1 = __nccwpck_require__(3084);
-// "provisioningState": "Succeeded",
-// "jobState": "Created",
 // Created, Stopped, Failed'
 // (Conflict) The Stream Analytics job is in a 'Idle' state. In order to perform a
 // 'Write' operation on the Stream Analytics Job Transformation,
@@ -48635,7 +48634,7 @@ const StopStates = new Set([
     'running',
     'scaling'
 ]);
-const StartStates = new Set(['stopped']);
+const StartStates = new Set(['stopped', 'failed']);
 /** a class that wraps StreamingAnalyticsManagement client in order to
  * accept request to Stop, Start, or update a Streaming Job
  * accepts parameters for the job name, resource group, and subscription id
@@ -48658,10 +48657,11 @@ class StreamingJobManager {
                 await this.client.streamingJobs.beginStopAndWait(this.resourceGroup, this.jobName);
                 const currentStatus = await this.getStatus();
                 if (!StartStates.has(currentStatus.toLocaleLowerCase())) {
-                    throw this.packError('Failed to stop the job', currentStatus);
+                    throw this.packError(`Failed to stop the job. Current status: ${currentStatus}`);
                 }
                 core.info(`Streaming job '${this.jobName}' has been stopped.`);
                 return {
+                    ok: true,
                     data: `Streaming job '${this.jobName}' has been successfully stopped.`,
                     status: 'success'
                 };
@@ -48673,12 +48673,13 @@ class StreamingJobManager {
         if (StartStates.has(status.toLocaleLowerCase())) {
             core.info(`Streaming job already in ${status} state -- no need to stop`);
             return {
+                ok: true,
                 data: `Streaming job '${this.jobName}' is already ${status}.`,
                 status: 'success'
             };
         }
         else {
-            throw this.packError(`Streaming job '${this.jobName}' is not in a stoppable state.`, null);
+            throw this.packError(`Streaming job '${this.jobName}' is not in a stoppable state.`);
         }
     }
     async start() {
@@ -48688,10 +48689,11 @@ class StreamingJobManager {
                 await this.client.streamingJobs.beginStartAndWait(this.resourceGroup, this.jobName);
                 const currentStatus = await this.getStatus();
                 if (!StopStates.has(currentStatus.toLocaleLowerCase())) {
-                    throw this.packError('Failed to start the job', currentStatus);
+                    throw this.packError(`Failed to start the job ${currentStatus}`);
                 }
                 core.info(`Streaming job '${this.jobName}' has been started.`);
                 return {
+                    ok: true,
                     data: `Streaming job '${this.jobName}' has been successfully started.`,
                     status: 'success'
                 };
@@ -48701,44 +48703,80 @@ class StreamingJobManager {
             }
         }
         // TODO: probably just running state.
+        // we are here AFTER a potential update that prior may have put the job in a 'failed' state
         if (StopStates.has(status.toLocaleLowerCase())) {
             core.info(`Streaming job already in ${status} state -- no need to start`);
             return {
+                ok: true,
                 data: `Streaming job '${this.jobName}' is already ${status}.`,
                 status: 'success'
             };
         }
         else {
-            throw this.packError(`Streaming job '${this.jobName}' is not in a startable state.`, null);
+            throw this.packError(`Streaming job '${this.jobName}' is not in a startable state.`);
         }
     }
     // TODO: fix the message parm
     packError(msg, error) {
-        core.error(`${msg} '${this.jobName}': ${error}`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const e = new Error(`${msg} '${this.jobName}': ${error}`);
-        return (e.data = error);
+        let e;
+        if (error instanceof Error) {
+            e = new Error(`${msg} '${this.jobName}': ${error.message}`);
+        }
+        else {
+            e = new Error(`${msg} '${this.jobName}': ${error}`);
+        }
+        core.error(e);
+        return e;
     }
     async checkStatus() {
         try {
-            return await this.getStatus();
+            return this.getStatus();
         }
         catch (error) {
             throw this.packError('Failed to retrieve the status of the job.', error);
         }
     }
-    async update() {
+    async update(restart = false, jobQuery) {
+        if (!jobQuery || jobQuery.length === 0) {
+            throw new Error('jobQuery is required when updating the job.');
+        }
         // Implement update logic here
+        const cc = await this.client.streamingJobs.get(this.resourceGroup, this.jobName, { expand: 'transformation' });
+        const oldQuery = cc.transformation?.query ?? '';
+        const transformationName = cc.transformation?.name ?? '';
+        if (oldQuery === jobQuery) {
+            core.info('No change in query, skipping update');
+            return;
+        }
+        // NOTE: terraform provider hard codes the "transformation name" to "main"
+        // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
+        if (!transformationName || transformationName.length === 0) {
+            throw new Error('Transformation name not found in the job.');
+        }
+        if (jobQuery.length === 0) {
+            throw new Error('jobQuery is required when updating the job.');
+        }
         await this.stop();
-        // update the asa sql
-        // await this.client.streamingJobs.update(this.resourceGroup, this.jobName, {)
-        const currentTransformation = await this.client.transformations.get(this.resourceGroup, this.jobName, 'transformationName');
-        currentTransformation.query = 'SELECT * FROM input';
-        await this.client.transformations.update(this.resourceGroup, this.jobName, 'transformationName', currentTransformation);
-        await this.start();
+        const newTransformation = {
+            query: jobQuery,
+            etag: cc.transformation?.etag
+        };
+        await this.client.transformations.update(this.resourceGroup, this.jobName, transformationName, newTransformation);
+        // go conservitive here....
+        if (restart) {
+            await this.start();
+        }
+    }
+    async getJobInfo() {
+        const rv = await this.client.streamingJobs.get(this.resourceGroup, this.jobName);
+        return {
+            jobState: rv.jobState?.toLocaleLowerCase() ?? '',
+            provisioningState: rv.provisioningState ?? '',
+            etag: rv.etag ?? ''
+        };
     }
     async getStatus() {
-        return ((await this.client.streamingJobs.get(this.resourceGroup, this.jobName)).jobState?.toLocaleLowerCase() ?? '');
+        return (await this.getJobInfo()).jobState;
     }
     async canStop() {
         return StopStates.has(await this.getStatus());

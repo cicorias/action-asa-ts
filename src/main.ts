@@ -15,6 +15,7 @@ type Settings = {
   resourceGroup: string
   subscriptionId: string
   jobQuery?: string
+  restart: boolean
   logLevel?: string
 }
 
@@ -56,7 +57,7 @@ export async function run(): Promise<void> {
         break
       case 'update':
         // TODO: implement
-        await asaManager.update()
+        await asaManager.update(settings.restart, settings.jobQuery || '')
         break
       case 'status':
         // already have status
@@ -81,7 +82,7 @@ function validateCommand(commandInput: string): commandInput is Command {
 }
 
 function getSettings(): Settings | undefined {
-  const commandInput = core.getInput('command', { required: true })
+  const commandInput = core.getInput('cmd', { required: true })
   if (!validateCommand(commandInput)) {
     const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`
     core.setFailed(msg)
@@ -94,6 +95,7 @@ function getSettings(): Settings | undefined {
     resourceGroup: core.getInput('resource-group', { required: true }),
     subscriptionId: core.getInput('subscription', { required: true }),
     jobQuery: core.getInput('job-query', { required: false }),
+    restart: core.getInput('restart', { required: false }) === 'true',
     logLevel: core.getInput('log-level', { required: false })
   }
 }
