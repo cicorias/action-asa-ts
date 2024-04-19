@@ -2,14 +2,13 @@ import * as core from '@actions/core'
 import { getLogLevel, setLogLevel, AzureLogLevel } from '@azure/logger'
 import { Response, StreamingJobManager } from './modules/asa'
 
-enum Command {
+export enum Command {
   Start = 'start',
   Stop = 'stop',
   Update = 'update',
   Status = 'status'
 }
-
-type Settings = {
+export type Settings = {
   cmd: Command
   jobName: string
   resourceGroup: string
@@ -25,17 +24,9 @@ type Settings = {
  */
 export async function run(): Promise<void> {
   try {
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-
     const settings = getSettings()
 
-    if (!settings) {
-      throw new Error('Invalid settings provided...')
-    }
-
-    // TODO: validate the logLevel input is one of these
     // verbose, info, warning, error
-
     setLogLevel((settings.logLevel as AzureLogLevel) || 'warning')
     core.info(`Log level set to: ${getLogLevel()}`)
 
@@ -45,10 +36,8 @@ export async function run(): Promise<void> {
       settings.subscriptionId
     )
 
-    let status = await asaManager.getStatus()
-    core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
-
-    let rv: Response
+    let rv: Response = { ok: false, data: 'No response' }
+    let status: string
     switch (settings.cmd) {
       case 'stop':
         rv = await asaManager.stop()
@@ -62,23 +51,20 @@ export async function run(): Promise<void> {
         break
       case 'status':
         // already have status
+        status = await asaManager.getStatus()
+        core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
         rv = {
           ok: true,
           data: `Streaming job '${settings.jobName}' is in state: ${status}`
         }
         break
-      default:
-        throw new Error(`Unknown command: ${settings.cmd}`)
     }
-
-    status = await asaManager.getStatus()
-    core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
     // Set outputs for other workflow steps to use
     core.setOutput('job-start-status', prettyResponse(rv))
   } catch (error) {
     // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) core.setFailed(error)
   }
 }
 
@@ -86,11 +72,10 @@ function validateCommand(commandInput: string): commandInput is Command {
   return Object.values(Command).includes(commandInput as Command)
 }
 
-function getSettings(): Settings | undefined {
+function getSettings(): Settings {
   const commandInput = core.getInput('cmd', { required: true })
   if (!validateCommand(commandInput)) {
     const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`
-    core.setFailed(msg)
     throw new Error(msg)
   }
 
@@ -110,5 +95,6 @@ function prettyResponse(response: Response): string {
   if (typeof response === 'object') {
     return JSON.stringify(response, null, 2)
   }
+  /* istanbul ignore next */
   return response as string
 }
