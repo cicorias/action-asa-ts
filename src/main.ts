@@ -1,6 +1,6 @@
 import * as core from '@actions/core'
 import { getLogLevel, setLogLevel, AzureLogLevel } from '@azure/logger'
-import { StreamingJobManager } from './modules/asa'
+import { Response, StreamingJobManager } from './modules/asa'
 
 enum Command {
   Start = 'start',
@@ -48,19 +48,24 @@ export async function run(): Promise<void> {
     let status = await asaManager.getStatus()
     core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
+    let rv: Response
     switch (settings.cmd) {
       case 'stop':
-        await asaManager.stop()
+        rv = await asaManager.stop()
         break
       case 'start':
-        await asaManager.start()
+        rv = await asaManager.start()
         break
       case 'update':
         // TODO: implement
-        await asaManager.update(settings.restart, settings.jobQuery || '')
+        rv = await asaManager.update(settings.restart, settings.jobQuery || '')
         break
       case 'status':
         // already have status
+        rv = {
+          ok: true,
+          data: `Streaming job '${settings.jobName}' is in state: ${status}`
+        }
         break
       default:
         throw new Error(`Unknown command: ${settings.cmd}`)
@@ -70,7 +75,7 @@ export async function run(): Promise<void> {
     core.info(`Streaming job '${settings.jobName}' is in state: ${status}`)
 
     // Set outputs for other workflow steps to use
-    core.setOutput('job-start-status', status)
+    core.setOutput('job-start-status', prettyResponse(rv))
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)
@@ -98,4 +103,12 @@ function getSettings(): Settings | undefined {
     restart: core.getInput('restart', { required: false }) === 'true',
     logLevel: core.getInput('log-level', { required: false })
   }
+}
+
+// convert Response type instance to a pretty JSON string
+function prettyResponse(response: Response): string {
+  if (typeof response === 'object') {
+    return JSON.stringify(response, null, 2)
+  }
+  return response as string
 }

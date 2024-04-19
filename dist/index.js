@@ -48533,19 +48533,24 @@ async function run() {
         const asaManager = new asa_1.StreamingJobManager(settings.jobName, settings.resourceGroup, settings.subscriptionId);
         let status = await asaManager.getStatus();
         core.info(`Streaming job '${settings.jobName}' is in state: ${status}`);
+        let rv;
         switch (settings.cmd) {
             case 'stop':
-                await asaManager.stop();
+                rv = await asaManager.stop();
                 break;
             case 'start':
-                await asaManager.start();
+                rv = await asaManager.start();
                 break;
             case 'update':
                 // TODO: implement
-                await asaManager.update(settings.restart, settings.jobQuery || '');
+                rv = await asaManager.update(settings.restart, settings.jobQuery || '');
                 break;
             case 'status':
                 // already have status
+                rv = {
+                    ok: true,
+                    data: `Streaming job '${settings.jobName}' is in state: ${status}`
+                };
                 break;
             default:
                 throw new Error(`Unknown command: ${settings.cmd}`);
@@ -48553,7 +48558,7 @@ async function run() {
         status = await asaManager.getStatus();
         core.info(`Streaming job '${settings.jobName}' is in state: ${status}`);
         // Set outputs for other workflow steps to use
-        core.setOutput('job-start-status', status);
+        core.setOutput('job-start-status', prettyResponse(rv));
     }
     catch (error) {
         // Fail the workflow run if an error occurs
@@ -48581,6 +48586,13 @@ function getSettings() {
         restart: core.getInput('restart', { required: false }) === 'true',
         logLevel: core.getInput('log-level', { required: false })
     };
+}
+// convert Response type instance to a pretty JSON string
+function prettyResponse(response) {
+    if (typeof response === 'object') {
+        return JSON.stringify(response, null, 2);
+    }
+    return response;
 }
 
 
@@ -48662,8 +48674,7 @@ class StreamingJobManager {
                 core.info(`Streaming job '${this.jobName}' has been stopped.`);
                 return {
                     ok: true,
-                    data: `Streaming job '${this.jobName}' has been successfully stopped.`,
-                    status: 'success'
+                    data: `Streaming job '${this.jobName}' has been successfully stopped.`
                 };
             }
             catch (error) {
@@ -48674,8 +48685,7 @@ class StreamingJobManager {
             core.info(`Streaming job already in ${status} state -- no need to stop`);
             return {
                 ok: true,
-                data: `Streaming job '${this.jobName}' is already ${status}.`,
-                status: 'success'
+                data: `Streaming job '${this.jobName}' is already ${status}.`
             };
         }
         else {
@@ -48694,8 +48704,7 @@ class StreamingJobManager {
                 core.info(`Streaming job '${this.jobName}' has been started.`);
                 return {
                     ok: true,
-                    data: `Streaming job '${this.jobName}' has been successfully started.`,
-                    status: 'success'
+                    data: `Streaming job '${this.jobName}' has been successfully started.`
                 };
             }
             catch (error) {
@@ -48708,13 +48717,50 @@ class StreamingJobManager {
             core.info(`Streaming job already in ${status} state -- no need to start`);
             return {
                 ok: true,
-                data: `Streaming job '${this.jobName}' is already ${status}.`,
-                status: 'success'
+                data: `Streaming job '${this.jobName}' is already ${status}.`
             };
         }
         else {
             throw this.packError(`Streaming job '${this.jobName}' is not in a startable state.`);
         }
+    }
+    async update(restart = false, jobQuery) {
+        if (!jobQuery || jobQuery.length === 0) {
+            throw new Error('jobQuery is required when updating the job.');
+        }
+        const currentJob = await this.client.streamingJobs.get(this.resourceGroup, this.jobName, { expand: 'transformation' });
+        const oldQuery = currentJob.transformation?.query ?? '';
+        const transformationName = currentJob.transformation?.name ?? '';
+        let isSameQuery = false;
+        let finalMessage = `Streaming job '${this.jobName}' with transformation '${transformationName}'`;
+        if (oldQuery === jobQuery && !restart) {
+            isSameQuery = true;
+            core.info('No change in query, skipping update');
+            finalMessage += ' has no changes to apply.';
+        }
+        // NOTE: terraform provider hard codes the "transformation name" to "main"
+        // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
+        if (!transformationName || transformationName.length === 0) {
+            throw new Error('Transformation name not found in the job.');
+        }
+        await this.stop();
+        const newTransformation = {
+            query: jobQuery,
+            etag: currentJob.transformation?.etag
+        };
+        if (!isSameQuery) {
+            core.info('Change in query, applying update');
+            finalMessage += ' has been updated.';
+            await this.client.transformations.update(this.resourceGroup, this.jobName, transformationName, newTransformation);
+        }
+        // go conservative here....
+        if (restart) {
+            await this.start();
+        }
+        return {
+            ok: true,
+            data: finalMessage
+        };
     }
     packError(msg, error) {
         let e;
@@ -48733,37 +48779,6 @@ class StreamingJobManager {
         }
         catch (error) {
             throw this.packError('Failed to retrieve the status of the job.', error);
-        }
-    }
-    async update(restart = false, jobQuery) {
-        if (!jobQuery || jobQuery.length === 0) {
-            throw new Error('jobQuery is required when updating the job.');
-        }
-        // Implement update logic here
-        const cc = await this.client.streamingJobs.get(this.resourceGroup, this.jobName, { expand: 'transformation' });
-        const oldQuery = cc.transformation?.query ?? '';
-        const transformationName = cc.transformation?.name ?? '';
-        if (oldQuery === jobQuery) {
-            core.info('No change in query, skipping update');
-            return;
-        }
-        // NOTE: terraform provider hard codes the "transformation name" to "main"
-        // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
-        if (!transformationName || transformationName.length === 0) {
-            throw new Error('Transformation name not found in the job.');
-        }
-        if (jobQuery.length === 0) {
-            throw new Error('jobQuery is required when updating the job.');
-        }
-        await this.stop();
-        const newTransformation = {
-            query: jobQuery,
-            etag: cc.transformation?.etag
-        };
-        await this.client.transformations.update(this.resourceGroup, this.jobName, transformationName, newTransformation);
-        // go conservitive here....
-        if (restart) {
-            await this.start();
         }
     }
     async getJobInfo() {

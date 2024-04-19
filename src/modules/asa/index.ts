@@ -2,9 +2,8 @@ import * as core from '@actions/core'
 import { StreamAnalyticsManagementClient } from '@azure/arm-streamanalytics'
 import { DefaultAzureCredential } from '@azure/identity'
 
-type Response = {
+export type Response = {
   ok: true
-  status: 'success'
   data: string
 }
 
@@ -79,8 +78,7 @@ export class StreamingJobManager {
 
         return {
           ok: true,
-          data: `Streaming job '${this.jobName}' has been successfully stopped.`,
-          status: 'success'
+          data: `Streaming job '${this.jobName}' has been successfully stopped.`
         }
       } catch (error) {
         throw this.packError('Error stopping the jobs', error as Error)
@@ -90,8 +88,7 @@ export class StreamingJobManager {
       core.info(`Streaming job already in ${status} state -- no need to stop`)
       return {
         ok: true,
-        data: `Streaming job '${this.jobName}' is already ${status}.`,
-        status: 'success'
+        data: `Streaming job '${this.jobName}' is already ${status}.`
       }
     } else {
       throw this.packError(
@@ -118,8 +115,7 @@ export class StreamingJobManager {
 
         return {
           ok: true,
-          data: `Streaming job '${this.jobName}' has been successfully started.`,
-          status: 'success'
+          data: `Streaming job '${this.jobName}' has been successfully started.`
         }
       } catch (error) {
         throw this.packError('Error starting the jobs', error as Error)
@@ -131,13 +127,68 @@ export class StreamingJobManager {
       core.info(`Streaming job already in ${status} state -- no need to start`)
       return {
         ok: true,
-        data: `Streaming job '${this.jobName}' is already ${status}.`,
-        status: 'success'
+        data: `Streaming job '${this.jobName}' is already ${status}.`
       }
     } else {
       throw this.packError(
         `Streaming job '${this.jobName}' is not in a startable state.`
       )
+    }
+  }
+
+  async update(restart = false, jobQuery: string): Promise<Response> {
+    if (!jobQuery || jobQuery.length === 0) {
+      throw new Error('jobQuery is required when updating the job.')
+    }
+
+    const currentJob = await this.client.streamingJobs.get(
+      this.resourceGroup,
+      this.jobName,
+      { expand: 'transformation' }
+    )
+
+    const oldQuery = currentJob.transformation?.query ?? ''
+    const transformationName = currentJob.transformation?.name ?? ''
+    let isSameQuery = false
+    let finalMessage = `Streaming job '${this.jobName}' with transformation '${transformationName}'`
+
+    if (oldQuery === jobQuery && !restart) {
+      isSameQuery = true
+      core.info('No change in query, skipping update')
+      finalMessage += ' has no changes to apply.'
+    }
+
+    // NOTE: terraform provider hard codes the "transformation name" to "main"
+    // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
+    if (!transformationName || transformationName.length === 0) {
+      throw new Error('Transformation name not found in the job.')
+    }
+
+    await this.stop()
+
+    const newTransformation: JobTransformation = {
+      query: jobQuery,
+      etag: currentJob.transformation?.etag
+    }
+
+    if (!isSameQuery) {
+      core.info('Change in query, applying update')
+      finalMessage += ' has been updated.'
+      await this.client.transformations.update(
+        this.resourceGroup,
+        this.jobName,
+        transformationName,
+        newTransformation
+      )
+    }
+    // go conservative here....
+    if (restart) {
+      await this.start()
+    }
+
+    return {
+      ok: true,
+      data: finalMessage
     }
   }
 
@@ -160,54 +211,6 @@ export class StreamingJobManager {
         'Failed to retrieve the status of the job.',
         error as Error
       )
-    }
-  }
-
-  async update(restart = false, jobQuery: string): Promise<void> {
-    if (!jobQuery || jobQuery.length === 0) {
-      throw new Error('jobQuery is required when updating the job.')
-    }
-    // Implement update logic here
-    const cc = await this.client.streamingJobs.get(
-      this.resourceGroup,
-      this.jobName,
-      { expand: 'transformation' }
-    )
-
-    const oldQuery = cc.transformation?.query ?? ''
-    const transformationName = cc.transformation?.name ?? ''
-
-    if (oldQuery === jobQuery) {
-      core.info('No change in query, skipping update')
-      return
-    }
-
-    // NOTE: terraform provider hard codes the "transformation name" to "main"
-    // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
-    if (!transformationName || transformationName.length === 0) {
-      throw new Error('Transformation name not found in the job.')
-    }
-
-    if (jobQuery.length === 0) {
-      throw new Error('jobQuery is required when updating the job.')
-    }
-
-    await this.stop()
-
-    const newTransformation: JobTransformation = {
-      query: jobQuery,
-      etag: cc.transformation?.etag
-    }
-
-    await this.client.transformations.update(
-      this.resourceGroup,
-      this.jobName,
-      transformationName,
-      newTransformation
-    )
-    // go conservitive here....
-    if (restart) {
-      await this.start()
     }
   }
 

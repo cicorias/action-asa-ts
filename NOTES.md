@@ -3,7 +3,9 @@
 ### Requirements
 
 - nodejs v20.x
-- local-action - `npm i -g @github/local-action`
+- local-action - `npm i -g @github/local-action` -- see
+  [installation](https://github.com/github/local-action?tab=readme-ov-file#installation)
+  for more information
 
 ### Actions Workflow
 
