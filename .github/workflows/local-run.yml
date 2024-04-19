@@ -8,6 +8,8 @@ on:
     branches:
       - addingpackages
 
+permissions: read-all
+
 env:
   ACTIONS_RUNNER_DEBUG: true
   ACTIONS_STEP_DEBUG: true
@@ -37,12 +39,10 @@ jobs:
         id: test-action
         uses: ./
         with:
+          cmd: status
           job-name: foobar
           resource-group: fizbuzz
           subscription: ab9999
-          job-query: |
-            select * from foobar
-          start-time: now
 
       - name: Print Output
         id: output
