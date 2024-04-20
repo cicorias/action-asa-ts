@@ -1,4 +1,4 @@
-name: azure-streamanalytics-helper-action
+name: Azure Stream Anlytics Job Deployment
 description:
   updates azure streaming analytics job wrapping with a stop and start
 author: Shawn Cicoria
