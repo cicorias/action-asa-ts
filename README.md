@@ -32,7 +32,7 @@ In the following, the Azure Login step is used, then a bash command to read in t
       - name: Read asa job query
         id: file_reader
         run: |
-          content=$(cat ./KOS.Asa/sosvariance/sosvariance.asaql)
+          content=$(cat ./Asa/sosvariance/sosvariance.asaql)
           echo "FILE_CONTENT<<EOF" >> $GITHUB_ENV
           echo "$content" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
