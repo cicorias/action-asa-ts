@@ -1,5 +1,7 @@
 # Overview
 
+[![coverage](badges/coverage.svg)](https://github.com/cicorias/action-asa-ts/actions/workflows/action-asa-ci.yml)
+
 This is a custom GitHub action meant for updating Azure Stream Analytics (ASA)
 jobs
 
