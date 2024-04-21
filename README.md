@@ -32,7 +32,6 @@ asa-deployment:
     - name: Checkout Git Repository
       uses: actions/checkout@v4
       with:
-        # Number of commits to fetch. 0 indicates all history for all branches and tags.
         fetch-depth: 1
     - name: Azure login
       uses: azure/login@v2
@@ -113,18 +112,19 @@ needed.
   bundler, along with formatting, linting, etc.
 
 ```json
-    "bundle": "npm run format:write && npm run package",
-    "ci:test": "npx jest",
-    "coverage": "npx make-coverage-badge --output-path ./badges/coverage.svg",
-    "format:write": "npx prettier --write .",
-    "format:check": "npx prettier --check .",
-    "lint": "npx eslint . -c ./.github/linters/.eslintrc.yml",
-    "lint:fix": "npx eslint . -c ./.github/linters/.eslintrc.yml --fix",
-    "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
-    "package:watch": "npm run package -- --watch",
-    "test": "npx jest",
-    "all": "npm run format:write && npm run lint && npm run test && npm run coverage && npm run package",
-    "local:action": "local-action . src/index.ts .env"
+"bundle": "npm run format:write && npm run package",
+"ci:test": "npx jest",
+"coverage": "npx make-coverage-badge --output-path ./badges/coverage.svg",
+"format:write": "npx prettier --write .",
+"format:check": "npx prettier --check .",
+"lint": "npx eslint . -c ./.github/linters/.eslintrc.yml",
+"lint:fix": "npx eslint . -c ./.github/linters/.eslintrc.yml --fix",
+"package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
+"package:watch": "npm run package -- --watch",
+"test": "npx jest",
+"all": "npm run format:write && npm run lint && npm run test 
+   && npm run coverage && npm run package",
+"local:action": "local-action . src/index.ts .env"
 ```
 
 ## Creating a Release
