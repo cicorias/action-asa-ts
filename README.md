@@ -122,7 +122,7 @@ needed.
 "package": "npx ncc build src/index.ts -o dist --source-map --license licenses.txt",
 "package:watch": "npm run package -- --watch",
 "test": "npx jest",
-"all": "npm run format:write && npm run lint && npm run test 
+"all": "npm run format:write && npm run lint && npm run test
    && npm run coverage && npm run package",
 "local:action": "local-action . src/index.ts .env"
 ```
