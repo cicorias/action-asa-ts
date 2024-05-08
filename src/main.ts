@@ -73,7 +73,9 @@ function validateCommand(commandInput: string): commandInput is Command {
 }
 
 function getSettings(): Settings {
-  const commandInput = core.getInput('cmd', { required: true })
+  const commandInput = core
+    .getInput('cmd', { required: true, trimWhitespace: true })
+    .toLocaleLowerCase()
   if (!validateCommand(commandInput)) {
     const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`
     throw new Error(msg)

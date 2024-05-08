@@ -122,8 +122,7 @@ describe('StreamingJobManager', () => {
 
     await manager.update(true, query)
 
-    expect(mockBeginStopAndWait).toHaveBeenCalledWith(resourceGroup, jobName)
-    expect(mockBeginStopAndWait).toHaveBeenCalledTimes(1)
+    expect(mockBeginStopAndWait).toHaveBeenCalledTimes(0)
     expect(mockUpdate).not.toHaveBeenCalled()
   })
 
@@ -160,7 +159,8 @@ describe('StreamingJobManager', () => {
     })
     mockUpdate.mockResolvedValue('stopped')
 
-    await expect(manager.update(true, query)).rejects.toThrow(
+    // amend a little text to ensure the duplicate query check is not triggered
+    await expect(manager.update(true, `${query}foo`)).rejects.toThrow(
       'Transformation name not found in the job.'
     )
   })

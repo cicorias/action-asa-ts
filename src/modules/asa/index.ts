@@ -157,6 +157,10 @@ export class StreamingJobManager {
       isSameQuery = true
       core.info('No change in query, skipping update')
       finalMessage += ' has no changes to apply.'
+      return {
+        ok: true,
+        data: finalMessage
+      }
     }
 
     // NOTE: terraform provider hard codes the "transformation name" to "main"

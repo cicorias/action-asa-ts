@@ -166,4 +166,35 @@ describe('main', () => {
       )
     )
   })
+
+  it('should handle Pascal case command', async () => {
+    getInputMock.mockImplementation(name => {
+      switch (name) {
+        case 'cmd':
+          return 'Start'
+        case 'job-name':
+          return 'myJobName'
+        case 'resource-group':
+          return 'myResourceGroup'
+        case 'subscription':
+          return 'mySubscriptionId'
+        default:
+          return ''
+      }
+    })
+
+    const startMock = jest
+      .spyOn(StreamingJobManager.prototype, 'start')
+      .mockImplementation(async () =>
+        Promise.resolve({ ok: true, data: 'Job started successfully' })
+      )
+
+    await run()
+
+    expect(startMock).toHaveBeenCalledTimes(1)
+    expect(setOutputMock).toHaveBeenCalledWith(
+      'job-start-status',
+      JSON.stringify({ ok: true, data: 'Job started successfully' }, null, 2)
+    )
+  })
 })
