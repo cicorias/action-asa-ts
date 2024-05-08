@@ -48563,7 +48563,9 @@ function validateCommand(commandInput) {
     return Object.values(Command).includes(commandInput);
 }
 function getSettings() {
-    const commandInput = core.getInput('cmd', { required: true });
+    const commandInput = core
+        .getInput('cmd', { required: true, trimWhitespace: true })
+        .toLocaleLowerCase();
     if (!validateCommand(commandInput)) {
         const msg = `Invalid command: ${commandInput}. Command must be one of: ${Object.values(Command).join(', ')}.`;
         throw new Error(msg);
@@ -48730,6 +48732,10 @@ class StreamingJobManager {
             isSameQuery = true;
             core.info('No change in query, skipping update');
             finalMessage += ' has no changes to apply.';
+            return {
+                ok: true,
+                data: finalMessage
+            };
         }
         // NOTE: terraform provider hard codes the "transformation name" to "main"
         // see: https://github.com/hashicorp/terraform-provider-azurerm/blob/29068c776821c1656c7ee80d9c93364dc891111e/internal/services/streamanalytics/stream_analytics_job_resource.go#L243
