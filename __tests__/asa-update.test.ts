@@ -160,7 +160,7 @@ describe('StreamingJobManager', () => {
     mockUpdate.mockResolvedValue('stopped')
 
     // amend a little text to ensure the duplicate query check is not triggered
-    await expect(manager.update(true, query + "foo")).rejects.toThrow(
+    await expect(manager.update(true, `${query}foo`)).rejects.toThrow(
       'Transformation name not found in the job.'
     )
   })
